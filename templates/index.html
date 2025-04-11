@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Todo App</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      background: #1e1e1e;
+      color: #f1f1f1;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .container {
+      background-color: #2b2b2b;
+      padding: 2em;
+      border-radius: 12px;
+      box-shadow: 0 0 15px rgba(0,0,0,0.3);
+      width: 100%;
+      max-width: 500px;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #ffcc70;
+    }
+
+    form {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      border-radius: 6px;
+      outline: none;
+    }
+
+    button {
+      background: #ff8c42;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: 0.2s ease;
+    }
+
+    button:hover {
+      background: #e37326;
+    }
+
+    .todo {
+      background: #3a3a3a;
+      padding: 10px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: 0.3s ease-in-out;
+    }
+
+    .todo.fade-out {
+      opacity: 0;
+      transform: translateX(-20px);
+    }
+
+    .title {
+      flex: 1;
+      word-break: break-word;
+    }
+
+    .actions button {
+      margin-left: 5px;
+    }
+
+    .actions {
+      display: flex;
+    }
+
+    input.editing {
+      flex: 1;
+      padding: 6px;
+      border-radius: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📝 Danh sách công việc</h1>
+
+    <form id="todo-form">
+      <input type="text" id="title" name="title" placeholder="Nhập công việc..." required>
+      <button type="submit">Thêm</button>
+    </form>
+
+    <div id="todo-list">
+      {% for todo in todos %}
+        <div class="todo" data-id="{{ todo.id }}">
+          <span class="title">{{ todo.title }}</span>
+          <div class="actions">
+            <button onclick="editTodo({{ todo.id }})">📝</button>
+            <button onclick="deleteTodo({{ todo.id }})">🗑️</button>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('todo-form');
+    const todoList = document.getElementById('todo-list');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const title = document.getElementById('title').value;
+      const formData = new FormData();
+      formData.append('title', title);
+
+      const res = await fetch('/add', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (res.redirected) {
+        window.location.href = res.url;
+      }
+    });
+
+    async function deleteTodo(id) {
+      const confirmDelete = confirm('Bạn có chắc muốn xóa công việc này không?');
+      if (!confirmDelete) return;
+
+      const todoEl = document.querySelector(`.todo[data-id='${id}']`);
+      if (!todoEl) return;
+
+      const res = await fetch(`/delete/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        todoEl.classList.add('fade-out');
+        setTimeout(() => todoEl.remove(), 300);
+      }
+    }
+
+    function editTodo(id) {
+      const todoEl = document.querySelector(`.todo[data-id='${id}']`);
+      const titleSpan = todoEl.querySelector('.title');
+      const oldTitle = titleSpan.innerText;
+
+      const input = document.createElement('input');
+      input.value = oldTitle;
+      input.classList.add('editing');
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') saveBtn.click();
+      });
+
+      const saveBtn = document.createElement('button');
+      saveBtn.textContent = '💾';
+      saveBtn.onclick = async () => {
+        const newTitle = input.value;
+        const res = await fetch(`/edit/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: newTitle })
+        });
+        if (res.ok) {
+          titleSpan.textContent = newTitle;
+          titleSpan.style.display = 'inline';
+          input.remove();
+          todoEl.querySelector('.actions').replaceChildren(editBtn, delBtn);
+        }
+      };
+
+      const editBtn = todoEl.querySelector('.actions button:first-child');
+      const delBtn = todoEl.querySelector('.actions button:last-child');
+
+      titleSpan.style.display = 'none';
+      titleSpan.insertAdjacentElement('beforebegin', input);
+      todoEl.querySelector('.actions').replaceChildren(saveBtn, delBtn);
+      input.focus();
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const todos = document.querySelectorAll('.todo');
+      todos.forEach((todo, i) => {
+        setTimeout(() => {
+          todo.style.opacity = '0';
+          todo.style.transform = 'translateY(-10px)';
+          todo.style.transition = '0.3s ease-in-out';
+          requestAnimationFrame(() => {
+            todo.style.opacity = '1';
+            todo.style.transform = 'translateY(0)';
+          });
+        }, i * 60);
+      });
+    });
+  </script>
+</body>
+</html>
